@@ -10,6 +10,7 @@ export default function Directive(descriptor,vm,el){
     this.name=descriptor.name;
     this.arg=descriptor.arg;
     this.rawVal=descriptor.rawVal;
+    this.attr=descriptor.attr;
     this.expression=descriptor.expression;
 
     this._listeners;

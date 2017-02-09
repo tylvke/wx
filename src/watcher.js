@@ -6,22 +6,25 @@ import {
 } from './util'
 
 import Dep from './observer/dep'
-export default function Watcher(vm,expression,cb,options) {
+export default function Watcher(vm,exrOrFn,cb,options) {
     if(options){
         extend(this,options);
     }
 
+    var isFn=typeof exrOrFn==='function';
+
     this.vm=vm;
     vm._watchers.push(this);
-    this.expression=expression;
+    this.expression=isFn ? exrOrFn.toString() : exrOrFn;
     this.cb=cb;
+    this.dirty=this.lazy;
     this.deps=Object.create(null);
-    this.getter=makeFn(expression);
+    this.getter=isFn ? exrOrFn : makeFn(exrOrFn);
 
-    function makeFn() {
+    function makeFn(expression) {
         return new Function('scope','return scope.'+expression+';')
     }
-    this.value=this.get();
+    this.value=this.dirty ? null :this.get();
 }
 
 Watcher.prototype.get=function () {
@@ -73,6 +76,22 @@ Watcher.prototype.run=function () {
     var oldVal=this.value;
     if(value!==oldVal){
         this.value=value;
-        this.cb.call(this.vm,value,oldVal);
+        this.cb && this.cb.call(this.vm,value,oldVal);
+    }
+}
+
+Watcher.prototype.evaluate=function () {
+    var target=Dep.target;
+    this.value=this.get();
+    this.dirty=false;
+    Dep.target=target;
+}
+
+Watcher.prototype.depend=function () {
+    var ids=Object.keys(this.deps);
+    var i=ids.length;
+    while (i--){
+        var id=ids[i];
+        this.deps[id].depend();
     }
 }

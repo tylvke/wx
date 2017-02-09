@@ -4,12 +4,20 @@
 var demo=new Wx({
     el:"#demo",
     data:{
-        name:"wangshuo"
+        name:"wangshuo",
+        id:"input",
+        age:20
     },
     methods:{
         changeName:function () {
             this.name="xiaoxue";
-            console.log(this.name)
+            this.id="input1";
+            this.age=22;
+        }
+    },
+    computed:{
+        groupUp:function () {
+            return this.age+1;
         }
     }
 })

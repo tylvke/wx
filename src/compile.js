@@ -93,10 +93,10 @@ function compileDirectives(attrs,options) {
             pushDir('on',publicDirectives.on)
         }
 
-        // if(bindRE.test(name)){
-        //     arg=dirName=name.replace(bindRE,'');
-        //     pushDir('bind',publicDirective.bind);
-        // }
+        if(bindRE.test(name)){
+            arg=dirName=name.replace(bindRE,'');
+            pushDir('bind',publicDirectives.bind);
+        }
         if(name.indexOf('v-')===0){
             arg=(arg=name.match(argRE)) && arg[1];
             if(arg){
