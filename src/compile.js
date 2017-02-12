@@ -8,6 +8,11 @@ let delimiters = /\{\{(.*)\}\}/;
 const bindRE=/^v-bind:|^:/
 const onRE=/^v-on:|^@/
 const argRE=/:(.*)$/;
+
+const terminalDirectives=[
+    'for',
+    'if'
+];
 export function compile(el,options){
     var nodeLinkFn=compileNode(el,options);
 
@@ -74,10 +79,38 @@ function makeChildLinkFn(linkFns) {
 function compileElement(el,options) {
     var linkFn;
     var hasAttrs=el.hasAttributes();
+
+    if(hasAttrs){
+        linkFn=checkTerminalDirective(el,options);
+    }
     if(hasAttrs){
         linkFn=compileDirectives(el.attributes,options);
     }
     return linkFn;
+}
+
+function checkTerminalDirective(el,options) {
+    var value,dirName;
+    for(var i=0,len=terminalDirectives.length;i<len;i++){
+        dirName=terminalDirectives[i];
+        value=el.getAttribute('v-'+dirName);
+        if(value!=null){
+            return makeTerminalDirective(el,dirName,value,options);
+        }
+    }
+}
+
+function makeTerminalDirective(el,dirName,value,options) {
+    var descriptor={
+        name:dirName,
+        expression:value,
+        rawVal:value,
+        def:terminalDirectives[dirName]
+    }
+
+    return function terminalNodeLinkFn(vm,el) {
+        vm._bindDir(descriptor,el);
+    }
 }
 
 function compileDirectives(attrs,options) {

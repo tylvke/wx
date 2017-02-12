@@ -322,7 +322,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	function Observer(value) {
 	    this.value = value;
-	    this.walk(value);
+	    if (Object.prototype.toString.call(value) === "[object Array]") {
+	        this.observeArray(value);
+	    } else {
+	        this.walk(value);
+	    }
 	}
 	
 	Observer.prototype.walk = function (value) {
@@ -332,12 +336,19 @@ return /******/ (function(modules) { // webpackBootstrap
 	    });
 	};
 	
+	Observer.prototype.observeArray = function (value) {
+	    for (var i = 0, len = value.length; i < len; i++) {
+	        observe(value[i]);
+	    }
+	};
+	
 	Observer.prototype.convert = function (key, val) {
 	    defineReactive(this.value, key, val);
 	};
 	
 	function defineReactive(obj, key, value) {
 	    var dep = new _dep2['default']();
+	
 	    var childObj = observe(value);
 	
 	    Object.defineProperty(obj, key, {
@@ -462,6 +473,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	var onRE = /^v-on:|^@/;
 	var argRE = /:(.*)$/;
 	
+	var terminalDirectives = ['for', 'if'];
+	
 	function compile(el, options) {
 	    var nodeLinkFn = compileNode(el, options);
 	
@@ -526,10 +539,38 @@ return /******/ (function(modules) { // webpackBootstrap
 	function compileElement(el, options) {
 	    var linkFn;
 	    var hasAttrs = el.hasAttributes();
+	
+	    if (hasAttrs) {
+	        linkFn = checkTerminalDirective(el, options);
+	    }
 	    if (hasAttrs) {
 	        linkFn = compileDirectives(el.attributes, options);
 	    }
 	    return linkFn;
+	}
+	
+	function checkTerminalDirective(el, options) {
+	    var value, dirName;
+	    for (var i = 0, len = terminalDirectives.length; i < len; i++) {
+	        dirName = terminalDirectives[i];
+	        value = el.getAttribute('v-' + dirName);
+	        if (value != null) {
+	            return makeTerminalDirective(el, dirName, value, options);
+	        }
+	    }
+	}
+	
+	function makeTerminalDirective(el, dirName, value, options) {
+	    var descriptor = {
+	        name: dirName,
+	        expression: value,
+	        rawVal: value,
+	        def: terminalDirectives[dirName]
+	    };
+	
+	    return function terminalNodeLinkFn(vm, el) {
+	        vm._bindDir(descriptor, el);
+	    };
 	}
 	
 	function compileDirectives(attrs, options) {
@@ -633,6 +674,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _bind2 = _interopRequireDefault(_bind);
 	
+	var _for = __webpack_require__(19);
+	
+	var _for2 = _interopRequireDefault(_for);
+	
 	var _modelIndex = __webpack_require__(13);
 	
 	var _modelIndex2 = _interopRequireDefault(_modelIndex);
@@ -641,6 +686,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    text: _text2['default'],
 	    on: _on2['default'],
 	    bind: _bind2['default'],
+	    'for': _for2['default'],
 	    model: _modelIndex2['default']
 	};
 	module.exports = exports['default'];
@@ -888,6 +934,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _observerDep2 = _interopRequireDefault(_observerDep);
 	
+	var _parsesExpression = __webpack_require__(18);
+	
 	function Watcher(vm, exrOrFn, cb, options) {
 	    if (options) {
 	        _util.extend(this, options);
@@ -901,11 +949,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.cb = cb;
 	    this.dirty = this.lazy;
 	    this.deps = Object.create(null);
-	    this.getter = isFn ? exrOrFn : makeFn(exrOrFn);
-	
-	    function makeFn(expression) {
-	        return new Function('scope', 'return scope.' + expression + ';');
+	    var res = {};
+	    if (isFn) {
+	        res.get = exrOrFn;
+	    } else {
+	        res = _parsesExpression.parseExpression(exrOrFn);
 	    }
+	    this.getter = res.get;
 	    this.value = this.dirty ? null : this.get();
 	}
 	
@@ -1001,6 +1051,103 @@ return /******/ (function(modules) { // webpackBootstrap
 	};
 	
 	module.exports = exports['default'];
+
+/***/ },
+/* 18 */
+/***/ function(module, exports) {
+
+	/**
+	 * Created by wangshuo on 2017/2/10.
+	 */
+	'use strict';
+	
+	exports.__esModule = true;
+	exports.parseExpression = parseExpression;
+	var wsRE = /\s/g;
+	var newlineRE = /\n/g;
+	var saveRE = /[\{,]\s*[\w\$_]+\s*:|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|new |typeof |void /g;
+	var restoreRE = /"(\d+)"/g;
+	var pathTestRE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*|\['.*?'\]|\[".*?"\]|\[\d+\]|\[[A-Za-z_$][\w$]*\])*$/;
+	var identRE = /[^\w$\.](?:[A-Za-z_$][\w$]*)/g;
+	var booleanLiteralRE = /^(?:true|false)$/;
+	
+	var saved = [];
+	
+	function save(str, isString) {
+	    var i = saved.length;
+	    saved[i] = isString ? str.replace(newlineRE, '\\n') : str;
+	    return '"' + i + '"';
+	}
+	
+	function rewrite(raw) {
+	    var c = raw.charAt(0);
+	    var path = raw.slice(1);
+	    path = path.indexOf('"') > -1 ? path.replace(restoreRE, restore) : path;
+	    return c + 'scope.' + path;
+	}
+	
+	function restore(str, i) {
+	    return saved[i];
+	}
+	
+	function parseExpression(exp) {
+	    exp = exp.trim();
+	    var res = { exp: exp };
+	    res.get = isSimplePath(exp) && exp.indexOf('[') < 0 ? makeGetterFn("scope." + exp) : compileGetter(exp);
+	
+	    return res;
+	}
+	
+	function compileGetter(exp) {
+	    saved.length = 0;
+	    var body = exp.replace(saveRE, save).replace(wsRE, '');
+	    body = (' ' + body).replace(identRE, rewrite).replace(restoreRE, restore);
+	    return makeGetterFn(body);
+	}
+	
+	function isSimplePath(exp) {
+	    return pathTestRE.test(exp) && !booleanLiteralRE.test(exp) && exp.slice(0, 5) !== 'Math';
+	}
+	
+	function makeGetterFn(exp) {
+	    return new Function('scope', 'return ' + exp + ';');
+	}
+
+/***/ },
+/* 19 */
+/***/ function(module, exports) {
+
+	/**
+	 * Created by wangshuo on 2017/2/10.
+	 */
+	"use strict";
+	
+	exports.__esModule = true;
+	var vFor = {
+	    bind: function bind() {
+	        var inMatch = this.expression.match(/(.*) in (.*)/);
+	        if (inMatch) {
+	            this.expression = inMatch[2];
+	        }
+	    },
+	    update: function update(data) {
+	        this.diff(data);
+	    },
+	    diff: function diff(data) {
+	        var self = this;
+	        var innerHtml = this.el.innerHTML;
+	        var fragment = document.createDocumentFragment();
+	        for (var i = 0, len = data.length; i < len; i++) {
+	            var html = innerHtml.replace(/\{\{(.*)\}\}/, data[i]);
+	            var frag = this.el.cloneNode(true);
+	            frag.innerHTML = html;
+	            fragment.appendChild(frag);
+	        }
+	        this.el.parentNode.replaceChild(fragment, self.el);
+	    }
+	};
+	exports["default"] = vFor;
+	module.exports = exports["default"];
 
 /***/ }
 /******/ ])

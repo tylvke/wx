@@ -4,15 +4,15 @@
 var demo=new Wx({
     el:"#demo",
     data:{
-        name:"wangshuo",
-        id:"input",
-        age:20
+        id:"username",
+        name:"李鹏",
+        age:20,
+        students:["李帅","王明"]
     },
     methods:{
-        changeName:function () {
-            this.name="xiaoxue";
-            this.id="input1";
-            this.age=22;
+        changePeople:function () {
+            this.name="小明";
+            this.age=17;
         }
     },
     computed:{

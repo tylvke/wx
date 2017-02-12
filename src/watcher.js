@@ -6,6 +6,10 @@ import {
 } from './util'
 
 import Dep from './observer/dep'
+import {
+    parseExpression
+} from './parses/expression'
+
 export default function Watcher(vm,exrOrFn,cb,options) {
     if(options){
         extend(this,options);
@@ -19,11 +23,14 @@ export default function Watcher(vm,exrOrFn,cb,options) {
     this.cb=cb;
     this.dirty=this.lazy;
     this.deps=Object.create(null);
-    this.getter=isFn ? exrOrFn : makeFn(exrOrFn);
-
-    function makeFn(expression) {
-        return new Function('scope','return scope.'+expression+';')
+    var res={};
+    if(isFn){
+        res.get=exrOrFn;
     }
+    else{
+        res=parseExpression(exrOrFn);
+    }
+    this.getter=res.get;
     this.value=this.dirty ? null :this.get();
 }
 

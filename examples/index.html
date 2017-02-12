@@ -9,8 +9,16 @@
     <div id="demo">
         <input :id="id" type="text" v-model="name">
         <p>hello {{name}}</p>
-        <p>{{groupUp}}</p>
-        <button @click="changeName()">changeName</button>
+        <p>年龄：{{age}}</p>
+        <p>长大一岁：{{groupUp}}</p>
+        <p>{{age>=18 ? "已成年" : "未成年"}}</p>
+        <button @click="changePeople()">changePeople</button>
+        <h2>同学：</h2>
+        <ul>
+            <li v-for="student in students">
+                {{student}}
+            </li>
+        </ul>
     </div>
     <script src="index.js"></script>
 </body>
