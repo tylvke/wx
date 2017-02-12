@@ -13,6 +13,8 @@ var demo=new Wx({
         changePeople:function () {
             this.name="小明";
             this.age=17;
+            console.log("b")
+
         }
     },
     computed:{

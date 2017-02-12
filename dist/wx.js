@@ -93,11 +93,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _internalState2 = _interopRequireDefault(_internalState);
 	
-	var _internalLifecycle = __webpack_require__(7);
+	var _internalLifecycle = __webpack_require__(9);
 	
 	var _internalLifecycle2 = _interopRequireDefault(_internalLifecycle);
 	
-	var _apiLifecycle = __webpack_require__(17);
+	var _apiLifecycle = __webpack_require__(19);
 	
 	var _apiLifecycle2 = _interopRequireDefault(_apiLifecycle);
 	
@@ -163,7 +163,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _observerIndex = __webpack_require__(5);
 	
-	var _watcher = __webpack_require__(16);
+	var _watcher = __webpack_require__(7);
 	
 	var _watcher2 = _interopRequireDefault(_watcher);
 	
@@ -426,12 +426,188 @@ return /******/ (function(modules) { // webpackBootstrap
 	'use strict';
 	
 	exports.__esModule = true;
+	exports['default'] = Watcher;
 	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
 	
-	var _compile = __webpack_require__(8);
+	var _util = __webpack_require__(4);
 	
-	var _directive = __webpack_require__(15);
+	var _observerDep = __webpack_require__(6);
+	
+	var _observerDep2 = _interopRequireDefault(_observerDep);
+	
+	var _parsesExpression = __webpack_require__(8);
+	
+	function Watcher(vm, exrOrFn, cb, options) {
+	    if (options) {
+	        _util.extend(this, options);
+	    }
+	
+	    var isFn = typeof exrOrFn === 'function';
+	
+	    this.vm = vm;
+	    vm._watchers.push(this);
+	    this.expression = isFn ? exrOrFn.toString() : exrOrFn;
+	    this.cb = cb;
+	    this.dirty = this.lazy;
+	    this.deps = Object.create(null);
+	    var res = {};
+	    if (isFn) {
+	        res.get = exrOrFn;
+	    } else {
+	        res = _parsesExpression.parseExpression(exrOrFn);
+	    }
+	    this.getter = res.get;
+	    this.value = this.dirty ? null : this.get();
+	}
+	
+	Watcher.prototype.get = function () {
+	    this.beforeGet();
+	    var scope = this.vm;
+	    var value = this.getter.call(scope, scope);
+	    this.afterGet();
+	    return value;
+	};
+	
+	Watcher.prototype.set = function (value) {
+	    this.vm[this.expression] = value;
+	};
+	
+	Watcher.prototype.beforeGet = function () {
+	    _observerDep2['default'].target = this;
+	    this.newDeps = Object.create(null);
+	};
+	Watcher.prototype.afterGet = function () {
+	    _observerDep2['default'].target = null;
+	    var ids = Object.keys(this.deps);
+	    var i = ids.length;
+	    while (i--) {
+	        var id = ids[i];
+	        if (!this.newDeps[id]) {
+	            this.deps[i].removeSub(this);
+	        }
+	    }
+	    this.deps = this.newDeps;
+	};
+	
+	Watcher.prototype.addDep = function (dep) {
+	    var id = dep.id;
+	    if (!this.newDeps[id]) {
+	        this.newDeps[id] = dep;
+	        if (!this.deps[id]) {
+	            this.deps[id] = dep;
+	            dep.addSub(this);
+	        }
+	    }
+	};
+	
+	Watcher.prototype.update = function () {
+	    this.run();
+	};
+	
+	Watcher.prototype.run = function () {
+	    var value = this.get();
+	    var oldVal = this.value;
+	    if (value !== oldVal) {
+	        this.value = value;
+	        this.cb && this.cb.call(this.vm, value, oldVal);
+	    }
+	};
+	
+	Watcher.prototype.evaluate = function () {
+	    var target = _observerDep2['default'].target;
+	    this.value = this.get();
+	    this.dirty = false;
+	    _observerDep2['default'].target = target;
+	};
+	
+	Watcher.prototype.depend = function () {
+	    var ids = Object.keys(this.deps);
+	    var i = ids.length;
+	    while (i--) {
+	        var id = ids[i];
+	        this.deps[id].depend();
+	    }
+	};
+	module.exports = exports['default'];
+
+/***/ },
+/* 8 */
+/***/ function(module, exports) {
+
+	/**
+	 * Created by wangshuo on 2017/2/10.
+	 */
+	'use strict';
+	
+	exports.__esModule = true;
+	exports.parseExpression = parseExpression;
+	var wsRE = /\s/g;
+	var newlineRE = /\n/g;
+	var saveRE = /[\{,]\s*[\w\$_]+\s*:|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|new |typeof |void /g;
+	var restoreRE = /"(\d+)"/g;
+	var pathTestRE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*|\['.*?'\]|\[".*?"\]|\[\d+\]|\[[A-Za-z_$][\w$]*\])*$/;
+	var identRE = /[^\w$\.](?:[A-Za-z_$][\w$]*)/g;
+	var booleanLiteralRE = /^(?:true|false)$/;
+	
+	var saved = [];
+	
+	function save(str, isString) {
+	    var i = saved.length;
+	    saved[i] = isString ? str.replace(newlineRE, '\\n') : str;
+	    return '"' + i + '"';
+	}
+	
+	function rewrite(raw) {
+	    var c = raw.charAt(0);
+	    var path = raw.slice(1);
+	    path = path.indexOf('"') > -1 ? path.replace(restoreRE, restore) : path;
+	    return c + 'scope.' + path;
+	}
+	
+	function restore(str, i) {
+	    return saved[i];
+	}
+	
+	function parseExpression(exp) {
+	    exp = exp.trim();
+	    var res = { exp: exp };
+	    res.get = isSimplePath(exp) && exp.indexOf('[') < 0 ? makeGetterFn("scope." + exp) : compileGetter(exp);
+	
+	    return res;
+	}
+	
+	function compileGetter(exp) {
+	    saved.length = 0;
+	    var body = exp.replace(saveRE, save).replace(wsRE, '');
+	    body = (' ' + body).replace(identRE, rewrite).replace(restoreRE, restore);
+	    return makeGetterFn(body);
+	}
+	
+	function isSimplePath(exp) {
+	    return pathTestRE.test(exp) && !booleanLiteralRE.test(exp) && exp.slice(0, 5) !== 'Math';
+	}
+	
+	function makeGetterFn(exp) {
+	    return new Function('scope', 'return ' + exp + ';');
+	}
+
+/***/ },
+/* 9 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Created by wangshuo on 2017/2/7.
+	 */
+	'use strict';
+	
+	exports.__esModule = true;
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+	
+	var _compile = __webpack_require__(10);
+	
+	var _directive = __webpack_require__(18);
 	
 	var _directive2 = _interopRequireDefault(_directive);
 	
@@ -450,7 +626,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports['default'];
 
 /***/ },
-/* 8 */
+/* 10 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -463,7 +639,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
 	
-	var _directivesIndex = __webpack_require__(9);
+	var _directivesIndex = __webpack_require__(11);
 	
 	var _directivesIndex2 = _interopRequireDefault(_directivesIndex);
 	
@@ -650,7 +826,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 
 /***/ },
-/* 9 */
+/* 11 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -662,23 +838,23 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
 	
-	var _on = __webpack_require__(10);
+	var _on = __webpack_require__(12);
 	
 	var _on2 = _interopRequireDefault(_on);
 	
-	var _text = __webpack_require__(11);
+	var _text = __webpack_require__(13);
 	
 	var _text2 = _interopRequireDefault(_text);
 	
-	var _bind = __webpack_require__(12);
+	var _bind = __webpack_require__(14);
 	
 	var _bind2 = _interopRequireDefault(_bind);
 	
-	var _for = __webpack_require__(19);
+	var _for = __webpack_require__(15);
 	
 	var _for2 = _interopRequireDefault(_for);
 	
-	var _modelIndex = __webpack_require__(13);
+	var _modelIndex = __webpack_require__(16);
 	
 	var _modelIndex2 = _interopRequireDefault(_modelIndex);
 	
@@ -692,7 +868,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports['default'];
 
 /***/ },
-/* 10 */
+/* 12 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -714,7 +890,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports['default'];
 
 /***/ },
-/* 11 */
+/* 13 */
 /***/ function(module, exports) {
 
 	/**
@@ -736,7 +912,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports['default'];
 
 /***/ },
-/* 12 */
+/* 14 */
 /***/ function(module, exports) {
 
 	/**
@@ -758,7 +934,43 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports["default"];
 
 /***/ },
-/* 13 */
+/* 15 */
+/***/ function(module, exports) {
+
+	/**
+	 * Created by wangshuo on 2017/2/10.
+	 */
+	"use strict";
+	
+	exports.__esModule = true;
+	var vFor = {
+	    bind: function bind() {
+	        var inMatch = this.expression.match(/(.*) in (.*)/);
+	        if (inMatch) {
+	            this.expression = inMatch[2];
+	        }
+	    },
+	    update: function update(data) {
+	        this.diff(data);
+	    },
+	    diff: function diff(data) {
+	        var self = this;
+	        var innerHtml = this.el.innerHTML;
+	        var fragment = document.createDocumentFragment();
+	        for (var i = 0, len = data.length; i < len; i++) {
+	            var html = innerHtml.replace(/\{\{(.*)\}\}/, data[i]);
+	            var frag = this.el.cloneNode(true);
+	            frag.innerHTML = html;
+	            fragment.appendChild(frag);
+	        }
+	        this.el.parentNode.replaceChild(fragment, self.el);
+	    }
+	};
+	exports["default"] = vFor;
+	module.exports = exports["default"];
+
+/***/ },
+/* 16 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -770,7 +982,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
 	
-	var _text = __webpack_require__(14);
+	var _text = __webpack_require__(17);
 	
 	var _text2 = _interopRequireDefault(_text);
 	
@@ -800,7 +1012,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports['default'];
 
 /***/ },
-/* 14 */
+/* 17 */
 /***/ function(module, exports) {
 
 	/**
@@ -829,7 +1041,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports['default'];
 
 /***/ },
-/* 15 */
+/* 18 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -844,7 +1056,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _util = __webpack_require__(4);
 	
-	var _watcher = __webpack_require__(16);
+	var _watcher = __webpack_require__(7);
 	
 	var _watcher2 = _interopRequireDefault(_watcher);
 	
@@ -915,122 +1127,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = exports['default'];
 
 /***/ },
-/* 16 */
-/***/ function(module, exports, __webpack_require__) {
-
-	/**
-	 * Created by wangshuo on 2017/2/7.
-	 */
-	'use strict';
-	
-	exports.__esModule = true;
-	exports['default'] = Watcher;
-	
-	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
-	
-	var _util = __webpack_require__(4);
-	
-	var _observerDep = __webpack_require__(6);
-	
-	var _observerDep2 = _interopRequireDefault(_observerDep);
-	
-	var _parsesExpression = __webpack_require__(18);
-	
-	function Watcher(vm, exrOrFn, cb, options) {
-	    if (options) {
-	        _util.extend(this, options);
-	    }
-	
-	    var isFn = typeof exrOrFn === 'function';
-	
-	    this.vm = vm;
-	    vm._watchers.push(this);
-	    this.expression = isFn ? exrOrFn.toString() : exrOrFn;
-	    this.cb = cb;
-	    this.dirty = this.lazy;
-	    this.deps = Object.create(null);
-	    var res = {};
-	    if (isFn) {
-	        res.get = exrOrFn;
-	    } else {
-	        res = _parsesExpression.parseExpression(exrOrFn);
-	    }
-	    this.getter = res.get;
-	    this.value = this.dirty ? null : this.get();
-	}
-	
-	Watcher.prototype.get = function () {
-	    this.beforeGet();
-	    var scope = this.vm;
-	    var value = this.getter.call(scope, scope);
-	    this.afterGet();
-	    return value;
-	};
-	
-	Watcher.prototype.set = function (value) {
-	    this.vm[this.expression] = value;
-	};
-	
-	Watcher.prototype.beforeGet = function () {
-	    _observerDep2['default'].target = this;
-	    this.newDeps = Object.create(null);
-	};
-	Watcher.prototype.afterGet = function () {
-	    _observerDep2['default'].target = null;
-	    var ids = Object.keys(this.deps);
-	    var i = ids.length;
-	    while (i--) {
-	        var id = ids[i];
-	        if (!this.newDeps[id]) {
-	            this.deps[i].removeSub(this);
-	        }
-	    }
-	    this.deps = this.newDeps;
-	};
-	
-	Watcher.prototype.addDep = function (dep) {
-	    var id = dep.id;
-	    if (!this.newDeps[id]) {
-	        this.newDeps[id] = dep;
-	        if (!this.deps[id]) {
-	            this.deps[id] = dep;
-	            dep.addSub(this);
-	        }
-	    }
-	};
-	
-	Watcher.prototype.update = function () {
-	    this.run();
-	};
-	
-	Watcher.prototype.run = function () {
-	    var value = this.get();
-	    var oldVal = this.value;
-	    if (value !== oldVal) {
-	        this.value = value;
-	        this.cb && this.cb.call(this.vm, value, oldVal);
-	    }
-	};
-	
-	Watcher.prototype.evaluate = function () {
-	    var target = _observerDep2['default'].target;
-	    this.value = this.get();
-	    this.dirty = false;
-	    _observerDep2['default'].target = target;
-	};
-	
-	Watcher.prototype.depend = function () {
-	    var ids = Object.keys(this.deps);
-	    var i = ids.length;
-	    while (i--) {
-	        var id = ids[i];
-	        this.deps[id].depend();
-	    }
-	};
-	module.exports = exports['default'];
-
-/***/ },
-/* 17 */
+/* 19 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -1051,103 +1148,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	};
 	
 	module.exports = exports['default'];
-
-/***/ },
-/* 18 */
-/***/ function(module, exports) {
-
-	/**
-	 * Created by wangshuo on 2017/2/10.
-	 */
-	'use strict';
-	
-	exports.__esModule = true;
-	exports.parseExpression = parseExpression;
-	var wsRE = /\s/g;
-	var newlineRE = /\n/g;
-	var saveRE = /[\{,]\s*[\w\$_]+\s*:|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|new |typeof |void /g;
-	var restoreRE = /"(\d+)"/g;
-	var pathTestRE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*|\['.*?'\]|\[".*?"\]|\[\d+\]|\[[A-Za-z_$][\w$]*\])*$/;
-	var identRE = /[^\w$\.](?:[A-Za-z_$][\w$]*)/g;
-	var booleanLiteralRE = /^(?:true|false)$/;
-	
-	var saved = [];
-	
-	function save(str, isString) {
-	    var i = saved.length;
-	    saved[i] = isString ? str.replace(newlineRE, '\\n') : str;
-	    return '"' + i + '"';
-	}
-	
-	function rewrite(raw) {
-	    var c = raw.charAt(0);
-	    var path = raw.slice(1);
-	    path = path.indexOf('"') > -1 ? path.replace(restoreRE, restore) : path;
-	    return c + 'scope.' + path;
-	}
-	
-	function restore(str, i) {
-	    return saved[i];
-	}
-	
-	function parseExpression(exp) {
-	    exp = exp.trim();
-	    var res = { exp: exp };
-	    res.get = isSimplePath(exp) && exp.indexOf('[') < 0 ? makeGetterFn("scope." + exp) : compileGetter(exp);
-	
-	    return res;
-	}
-	
-	function compileGetter(exp) {
-	    saved.length = 0;
-	    var body = exp.replace(saveRE, save).replace(wsRE, '');
-	    body = (' ' + body).replace(identRE, rewrite).replace(restoreRE, restore);
-	    return makeGetterFn(body);
-	}
-	
-	function isSimplePath(exp) {
-	    return pathTestRE.test(exp) && !booleanLiteralRE.test(exp) && exp.slice(0, 5) !== 'Math';
-	}
-	
-	function makeGetterFn(exp) {
-	    return new Function('scope', 'return ' + exp + ';');
-	}
-
-/***/ },
-/* 19 */
-/***/ function(module, exports) {
-
-	/**
-	 * Created by wangshuo on 2017/2/10.
-	 */
-	"use strict";
-	
-	exports.__esModule = true;
-	var vFor = {
-	    bind: function bind() {
-	        var inMatch = this.expression.match(/(.*) in (.*)/);
-	        if (inMatch) {
-	            this.expression = inMatch[2];
-	        }
-	    },
-	    update: function update(data) {
-	        this.diff(data);
-	    },
-	    diff: function diff(data) {
-	        var self = this;
-	        var innerHtml = this.el.innerHTML;
-	        var fragment = document.createDocumentFragment();
-	        for (var i = 0, len = data.length; i < len; i++) {
-	            var html = innerHtml.replace(/\{\{(.*)\}\}/, data[i]);
-	            var frag = this.el.cloneNode(true);
-	            frag.innerHTML = html;
-	            fragment.appendChild(frag);
-	        }
-	        this.el.parentNode.replaceChild(fragment, self.el);
-	    }
-	};
-	exports["default"] = vFor;
-	module.exports = exports["default"];
 
 /***/ }
 /******/ ])

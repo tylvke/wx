@@ -9,7 +9,7 @@
     <div id="demo">
         <input :id="id" type="text" v-model="name">
         <p>hello {{name}}</p>
-        <p>年龄：{{age}}</p>
+        <p>年龄1：{{age}}</p>
         <p>长大一岁：{{groupUp}}</p>
         <p>{{age>=18 ? "已成年" : "未成年"}}</p>
         <button @click="changePeople()">changePeople</button>
@@ -20,6 +20,5 @@
             </li>
         </ul>
     </div>
-    <script src="index.js"></script>
 </body>
 </html>
