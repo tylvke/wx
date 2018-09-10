@@ -1,7 +1,6 @@
 /**
  * Created by wangshuo on 2017/2/12.
  */
-var webpack = require('webpack');
 var path = require('path');
 var HtmlWebpackPlugin=require('html-webpack-plugin');
 
@@ -17,5 +16,6 @@ module.exports = {
             template:path.resolve(__dirname,'index.html')
         }
     )],
-    watch: true,
+    watch: true
+
 }

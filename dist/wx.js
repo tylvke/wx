@@ -270,6 +270,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	exports.on = on;
 	exports.off = off;
 	exports.extend = extend;
+	exports.def = def;
 	
 	function bind(fn, ctx) {
 	    return function (a) {
@@ -298,6 +299,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	        to[keys[i]] = from[keys[i]];
 	    }
 	    return to;
+	}
+	
+	function def(obj, key, val, enumerable) {
+	    Object.defineProperty(obj, key, {
+	        val: val,
+	        enumerable: enumerable,
+	        writable: true,
+	        configurable: true
+	    });
 	}
 
 /***/ },

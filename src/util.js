@@ -29,3 +29,12 @@ export function extend(to,from) {
     }
     return to
 }
+
+export function def(obj,key,val,enumerable) {
+    Object.defineProperty(obj,key,{
+        val:val,
+        enumerable:enumerable,
+        writable:true,
+        configurable:true
+    })
+}
